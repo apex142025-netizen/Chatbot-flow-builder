@@ -1,0 +1,48 @@
+name: Deploy on Self-Hosted Runner with PM2 (No Ecosystem)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Sync files to app directory
+        run: |
+          APP_DIR="/home/apexes-chatbot/htdocs/chatbot.apexes.click/chatbot-flow-builder"
+          mkdir -p $APP_DIR
+          rsync -av --delete ./ $APP_DIR/
+
+      - name: Install & Build
+        run: |
+          cd /home/apexes-chatbot/htdocs/chatbot.apexes.click/chatbot-flow-builder
+          npm install --production
+          npm run build
+
+      - name: Start or Restart PM2 App
+        run: |
+          cd /home/apexes-chatbot/htdocs/chatbot.apexes.click/chatbot-flow-builder
+
+          APP_NAME="chatbot-flow-builder"
+
+          if pm2 describe $APP_NAME > /dev/null 2>&1; then
+            echo "App exists → restarting"
+            pm2 restart $APP_NAME
+          else
+            echo "App not found → starting"
+            pm2 start npm --name "$APP_NAME" -- start
+          fi
+
+          pm2 save
